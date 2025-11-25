@@ -1,0 +1,31 @@
+name: voxcpm
+
+services:
+  voxcpm:
+    build: .
+    container_name: voxcpm-app
+    ports:
+      - "1234:1234"
+    environment:
+      - VOXCPM_FORCE_CPU=1
+      - SERVER_PORT=1234
+      - SERVER_NAME=0.0.0.0
+      - TOKENIZERS_PARALLELISM=false
+    volumes:
+      # Mount models directory for persistent storage
+      - ./models:/app/models
+      # Mount cache directories for faster subsequent runs
+      - voxcpm-hf-cache:/root/.cache/huggingface
+      - voxcpm-ms-cache:/root/.cache/modelscope
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:1234/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+volumes:
+  voxcpm-hf-cache:
+  voxcpm-ms-cache:
+

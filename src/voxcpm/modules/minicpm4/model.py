@@ -153,7 +153,7 @@ class MiniCPMAttention(nn.Module):
         cos, sin = position_emb
 
         query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
-        
+
         # ref: https://github.com/pytorch/pytorch/issues/163597
         # there is a bug in MPS for non-contiguous tensors, so we need to make them contiguous
         query_states = query_states.contiguous()
@@ -198,22 +198,42 @@ class MiniCPMAttention(nn.Module):
 
         key_cache, value_cache = kv_cache
 
-        key_cache[:, :, position_id, :] = key_states
-        value_cache[:, :, position_id, :] = value_states
+        # Handle position_id as either int or tensor
+        if isinstance(position_id, torch.Tensor):
+            position_id = position_id.item() if position_id.numel() == 1 else int(position_id)
 
-        attn_mask = torch.arange(key_cache.size(2), device=key_cache.device) <= position_id
+        # Ensure batch size matches cache (cache is initialized with batch_size=1)
+        # If hidden_states has batch_size > 1, only use the first batch item
+        if bsz > 1:
+            key_states = key_states[0:1]  # Keep batch dimension but only first item
+            value_states = value_states[0:1]
+        
+        # key_states shape: (bsz, num_key_value_heads, 1, head_dim) -> (bsz, num_key_value_heads, head_dim)
+        # key_cache shape: (batch_size, num_kv_heads, max_length, dim_kv_head)
+        # We need to squeeze the sequence dimension (dim=2) from key_states
+        key_cache[:, :, position_id, :] = key_states[:, :, 0, :]
+        value_cache[:, :, position_id, :] = value_states[:, :, 0, :]
+
+        # Create attention mask - 2D mask (1, seq_len) for scaled_dot_product_attention
+        seq_len = key_cache.size(2)
+        attn_mask_1d = torch.arange(seq_len, device=key_cache.device) <= position_id
+        # Reshape to (1, seq_len) - broadcastable to (batch, num_heads, 1, seq_len)
+        attn_mask = attn_mask_1d.unsqueeze(0)
 
         # ref: https://github.com/pytorch/pytorch/issues/163597
         # there is a bug in MPS for non-contiguous tensors, so we need to make them contiguous
         query_states = query_states.contiguous()
         key_cache = key_cache.contiguous()
         value_cache = value_cache.contiguous()
+
+        # enable_gqa may not work properly on CPU, so disable it for CPU devices
+        enable_gqa_flag = query_states.device.type == 'cuda'
         attn_output = torch.nn.functional.scaled_dot_product_attention(
             query_states,
             key_cache,
             value_cache,
             attn_mask=attn_mask,
-            enable_gqa=True,
+            enable_gqa=enable_gqa_flag,
         )
 
         attn_output = attn_output.transpose(1, 2).contiguous()
