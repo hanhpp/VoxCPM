@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Documentation
+*.md
+LICENSE
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Models (will be downloaded at runtime or mounted as volume)
+models/
+
+# Cache directories (will be created at runtime)
+.cache/
+*.cache
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+

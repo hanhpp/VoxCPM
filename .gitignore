@@ -1,3 +1,101 @@
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 launch.json
-__pycache__
-voxcpm.egg-info
+*.code-workspace
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Model files (large binary files - should be downloaded at runtime)
+models/**/*.pth
+models/**/*.bin
+models/**/*.pt
+models/**/*.safetensors
+models/**/*.onnx
+models/**/*.ckpt
+# Exclude large image assets in models directory
+models/**/*.png
+models/**/*.jpg
+models/**/*.jpeg
+# Keep config and text files in models, exclude binary assets
+!models/**/*.json
+!models/**/*.txt
+!models/**/*.md
+
+# Cache directories
+.cache/
+*.cache
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# HuggingFace and ModelScope caches (should be in user's home, not repo)
+.huggingface/
+*.huggingface/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Environment variables
+.env
+.env.local
+
+# Docker
+.dockerignore
+# Note: Keep Dockerfile and docker-compose.yml
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# Data files (if any)
+data/
+datasets/
+*.wav
+*.mp3
+*.mp4
+*.avi
+# But keep example.wav in examples/
+!examples/*.wav
+
+# Check scripts (optional - comment out if you want to track them)
+# check-docker.ps1
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# Profiling data
+*.prof
