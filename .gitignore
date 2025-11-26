@@ -106,3 +106,5 @@ lib/
 bin/
 share/
 lib64
+*.rst 
+pyvenv.cfg
