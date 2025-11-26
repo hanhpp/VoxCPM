@@ -104,3 +104,5 @@ coverage.xml
 # python libs
 lib/
 bin/
+share/
+lib64
