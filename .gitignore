@@ -99,3 +99,8 @@ coverage.xml
 
 # Profiling data
 *.prof
+
+
+# python libs
+lib/
+bin/
