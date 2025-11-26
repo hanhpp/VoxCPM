@@ -214,25 +214,35 @@ class MiniCPMAttention(nn.Module):
         key_cache[:, :, position_id, :] = key_states[:, :, 0, :]
         value_cache[:, :, position_id, :] = value_states[:, :, 0, :]
 
-        # Create attention mask - 2D mask (1, seq_len) for scaled_dot_product_attention
-        seq_len = key_cache.size(2)
-        attn_mask_1d = torch.arange(seq_len, device=key_cache.device) <= position_id
-        # Reshape to (1, seq_len) - broadcastable to (batch, num_heads, 1, seq_len)
-        attn_mask = attn_mask_1d.unsqueeze(0)
+        # Slice cache to only include valid positions (up to position_id + 1)
+        # This avoids shape mismatches in scaled_dot_product_attention with GQA
+        current_seq_len = position_id + 1
+        key_cache_slice = key_cache[:, :, :current_seq_len, :]
+        value_cache_slice = value_cache[:, :, :current_seq_len, :]
 
         # ref: https://github.com/pytorch/pytorch/issues/163597
         # there is a bug in MPS for non-contiguous tensors, so we need to make them contiguous
         query_states = query_states.contiguous()
-        key_cache = key_cache.contiguous()
-        value_cache = value_cache.contiguous()
+        key_cache_slice = key_cache_slice.contiguous()
+        value_cache_slice = value_cache_slice.contiguous()
 
         # enable_gqa may not work properly on CPU, so disable it for CPU devices
         enable_gqa_flag = query_states.device.type == 'cuda'
+        
+        # On CPU, manually expand key/value cache to match query heads for GQA
+        if not enable_gqa_flag and self.num_key_value_groups > 1:
+            # Repeat key/value heads to match query heads
+            # key_cache_slice: (bsz, num_kv_heads, seq_len, head_dim)
+            # Expand to: (bsz, num_heads, seq_len, head_dim)
+            key_cache_slice = key_cache_slice.repeat_interleave(self.num_key_value_groups, dim=1)
+            value_cache_slice = value_cache_slice.repeat_interleave(self.num_key_value_groups, dim=1)
+        
         attn_output = torch.nn.functional.scaled_dot_product_attention(
             query_states,
-            key_cache,
-            value_cache,
-            attn_mask=attn_mask,
+            key_cache_slice,
+            value_cache_slice,
+            attn_mask=None,
+            is_causal=False,
             enable_gqa=enable_gqa_flag,
         )
 

@@ -38,6 +38,45 @@ from ..modules.minicpm4 import MiniCPM4Config, MiniCPMModel
 from .utils import get_dtype, mask_multichar_chinese_tokens
 
 
+def load_audio(file_path: str) -> Tuple[torch.Tensor, int]:
+    """
+    Load audio file with fallback to soundfile if torchcodec is not available.
+    
+    Args:
+        file_path: Path to audio file
+        
+    Returns:
+        Tuple of (audio_tensor, sample_rate) where audio_tensor has shape [channels, samples]
+    """
+    try:
+        # Try torchaudio first (requires torchcodec in newer versions)
+        audio, sr = torchaudio.load(file_path)
+        return audio, sr
+    except (ImportError, RuntimeError) as e:
+        # Fallback to soundfile if torchcodec is missing
+        error_msg = str(e).lower()
+        if "torchcodec" in error_msg or "torch codec" in error_msg:
+            try:
+                import soundfile as sf
+                data, sr = sf.read(file_path, dtype='float32')
+                # Convert to torch tensor and ensure correct shape [channels, samples]
+                if len(data.shape) == 1:
+                    # Mono audio: add channel dimension
+                    audio = torch.from_numpy(data).unsqueeze(0)
+                else:
+                    # Multi-channel: transpose from [samples, channels] to [channels, samples]
+                    audio = torch.from_numpy(data).T
+                return audio, sr
+            except ImportError:
+                raise ImportError(
+                    "Neither torchcodec nor soundfile is available. "
+                    "Please install torchcodec or ensure soundfile is installed."
+                ) from e
+        else:
+            # Re-raise if it's not a torchcodec-related error
+            raise
+
+
 class VoxCPMEncoderConfig(BaseModel):
     hidden_dim: int = 1024
     ffn_dim: int = 4096
@@ -252,7 +291,7 @@ class VoxCPMModel(nn.Module):
             )
             text_length = text_token.shape[0]
 
-            audio, sr = torchaudio.load(prompt_wav_path)
+            audio, sr = load_audio(prompt_wav_path)
             if audio.size(0) > 1:
                 audio = audio.mean(dim=0, keepdim=True)
 
@@ -370,7 +409,7 @@ class VoxCPMModel(nn.Module):
         text_token = torch.LongTensor(self.text_tokenizer(prompt_text))
 
         # load audio
-        audio, sr = torchaudio.load(prompt_wav_path)
+        audio, sr = load_audio(prompt_wav_path)
         if audio.size(0) > 1:
             audio = audio.mean(dim=0, keepdim=True)
 

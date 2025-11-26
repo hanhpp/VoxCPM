@@ -14,6 +14,45 @@ from modelscope.pipelines import pipeline
 from modelscope.utils.constant import Tasks
 
 
+def load_audio(file_path: str):
+    """
+    Load audio file with fallback to soundfile if torchcodec is not available.
+    
+    Args:
+        file_path: Path to audio file
+        
+    Returns:
+        Tuple of (audio_tensor, sample_rate) where audio_tensor has shape [channels, samples]
+    """
+    try:
+        # Try torchaudio first (requires torchcodec in newer versions)
+        audio, sr = torchaudio.load(file_path)
+        return audio, sr
+    except (ImportError, RuntimeError) as e:
+        # Fallback to soundfile if torchcodec is missing
+        error_msg = str(e).lower()
+        if "torchcodec" in error_msg or "torch codec" in error_msg:
+            try:
+                import soundfile as sf
+                data, sr = sf.read(file_path, dtype='float32')
+                # Convert to torch tensor and ensure correct shape [channels, samples]
+                if len(data.shape) == 1:
+                    # Mono audio: add channel dimension
+                    audio = torch.from_numpy(data).unsqueeze(0)
+                else:
+                    # Multi-channel: transpose from [samples, channels] to [channels, samples]
+                    audio = torch.from_numpy(data).T
+                return audio, sr
+            except ImportError:
+                raise ImportError(
+                    "Neither torchcodec nor soundfile is available. "
+                    "Please install torchcodec or ensure soundfile is installed."
+                ) from e
+        else:
+            # Re-raise if it's not a torchcodec-related error
+            raise
+
+
 class ZipEnhancer:
     """ZipEnhancer Audio Denoising Enhancer"""
     def __init__(self, model_path: str = "iic/speech_zipenhancer_ans_multiloss_16k_base"):
@@ -35,7 +74,7 @@ class ZipEnhancer:
         Args:
             wav_path: Audio file path
         """
-        audio, sr = torchaudio.load(wav_path)
+        audio, sr = load_audio(wav_path)
         loudness = torchaudio.functional.loudness(audio, sr)
         normalized_audio = torchaudio.functional.gain(audio, -20-loudness)
         torchaudio.save(wav_path, normalized_audio, sr)
